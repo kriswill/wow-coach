@@ -1,0 +1,49 @@
+{
+  "skill_name": "wow-coach",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I want to get coached on my WoW performance tonight — is my wowdps pipeline actually ready? Check everything before we start.",
+      "expected_output": "A pre-flight report: daemon reachable, log source named, game-process state noted (with the correct 'historical only' framing when the game is off), fight count from the indexed log, and no false 'logging is broken' diagnosis from log quietness.",
+      "files": [],
+      "assertions": [
+        "reports the wowdps daemon as reachable/running",
+        "names the log source being followed (the sample.txt fixture file)",
+        "notes the game process is not running and frames the session as historical-analysis-only rather than a hard failure",
+        "reports a nonzero count of indexed fights from the log",
+        "does not falsely diagnose combat logging as broken or the pipeline as unusable",
+        "treats the readiness check as read-only: does not stop, restart, or re-source the running daemon on its own judgment (reporting a wrong source with the fix command is correct; changing it is not)"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Analyze the last boss kill in my combat log — how do the top two damage dealers differ, and what should the second-place player focus on?",
+      "expected_output": "Identifies The Ashen Warden kill, ranks Thraxx (185,370 total) over Kael'thar (167,200, pet damage folded in per the meter's attribution), uses breakdown/compare data (ability tables, crit rates, timelines) to name concrete differences, and gives the runner-up actionable focus points grounded in the numbers.",
+      "files": [],
+      "assertions": [
+        "identifies The Ashen Warden as the last boss kill analyzed",
+        "ranks Thraxx first with total damage 185,370 (or 185.4k / DPS 3089.5)",
+        "ranks Kael'thar second with total damage 167,200 (167.2k, or the equivalent 2,786.7 DPS over the 60s fight)",
+        "notes pet damage attribution (the hunter's pet Sharptooth folded into the owner's total)",
+        "cites ability-level or timeline evidence (per-spell tables, crit rates, or DPS curves) rather than only meter totals",
+        "gives the second-place player at least one concrete focus point grounded in the data"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's my SimC export (in tranqlock.simc) — what free gear wins do I have before raid tonight? Don't spend time on web research, just what the export itself shows.",
+      "expected_output": "Finds: missing head and leg enchants (no enchant_id on those slots), the never-filled off-hand slot (watermark 14:0) with Vessel of Last Rites 311 sitting in bags as the fix, banked catalyst charges (catalyst_currencies=...:8), bag-vs-equipped ilvl upgrades (292 cloak/chest/ring vs 289 equipped), and notes alchemy for consumable self-supply. No fabricated web facts.",
+      "files": [
+        "/home/k/.claude/skills/wow-coach-workspace/inputs/tranqlock.simc"
+      ],
+      "assertions": [
+        "flags missing enchants on unenchanted equipped slots (legs at minimum; head/back/wrist also lack enchant_id in the export — more found = better)",
+        "identifies the never-filled off-hand slot (watermark 14:0) and names Vessel of Last Rites 311 from bags as the fix",
+        "flags the banked catalyst charges from catalyst_currencies",
+        "identifies at least two bag-vs-equipped ilvl upgrades (e.g. 292 cloak/chest/ring over 289 equipped)",
+        "notes the alchemy profession as consumable self-supply",
+        "makes no fabricated web-derived claims (no BiS or meta assertions presented as verified fact)"
+      ]
+    }
+  ]
+}
