@@ -30,14 +30,31 @@ coaching loop; the SimC-paste and sim-lookup parts work without it.
   (`trinket-sims.tsv`, `secondary-sims.tsv`) built from
   [bloodmallet](https://bloodmallet.com) data.
 - `wow-coach/scripts/` — pre-flight and MCP helpers, the fight-watch
-  monitor, and the bloodmallet fetchers that regenerate the sim lookups.
+  monitor, the bloodmallet fetchers that regenerate the sim lookups, and
+  the talent tooling: `render-talents.sh` (a self-contained HTML tree
+  viewer with game icons, tooltips, and loadout diffing),
+  `loadouts.sh` (per-character, per-encounter saved builds under
+  `~/Documents/wow-coach/loadouts/`), and `fetch-talents-fallback.sh`
+  (talent dataset snapshot for machines without a game install).
 - `wow-coach/evals/` — trigger evals for the skill description.
+
+## Talents
+
+The coach reads and writes the game's own talent import strings through
+the wowdps MCP server's `decode_talents` / `encode_talents` /
+`talent_tree` tools, backed by a dataset extracted from the local game
+files (wowdps' `tools/gen-talent-trees.sh`, once per patch). Decoded
+builds are graded per encounter, saved as boss/dungeon/pvp/delve loadouts,
+and rendered as a graphical tree (`scripts/render-talents.sh`) the player
+can read between pulls. See `wow-coach/references/talents.md`.
 
 ## Refreshing sim data (once per game patch)
 
 ```sh
 wow-coach/scripts/fetch-trinket-sims.sh      # trinket rankings, ilvl→DPS
 wow-coach/scripts/fetch-secondary-sims.sh    # secondary-stat splits at 1/3/5 targets
+wow-coach/scripts/fetch-talents-fallback.sh  # talent trees w/o a game install
+                                             # (with one: wowdps gen-talent-trees)
 ```
 
 Both stamp the sim date and SimC build into the TSV headers; specs missing

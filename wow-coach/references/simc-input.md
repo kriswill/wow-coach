@@ -24,12 +24,11 @@ research runs — several high-value findings need no web at all.
 5. **Upgrade currencies** — `upgrade_currencies=` for crest/valor equivalents
    sitting unused against low-ilvl equipped slots.
 6. **Saved loadouts** — the commented `# Saved Loadout:` talent strings, plus
-   the active `talents=` line. You cannot decode the strings locally, but you
-   CAN: list them, note which is active, and hand them to a research agent to
-   compare against published meta strings (or ask the player to hover nodes).
-   Never fabricate or hand-edit a talent string — they're build-stamped
-   encodings; relay only strings captured verbatim from a live source, and
-   warn when the source's game build differs from the player's.
+   the active `talents=` line. Decode them with the `decode_talents` MCP
+   tool (see `references/talents.md`): spec, hero tree, every node with
+   ranks and choice picks. Never fabricate or hand-edit a talent string by
+   text surgery — mint one only through `encode_talents`, and warn when the
+   source's game build differs from the player's.
 7. **Tier set audit** — pieces sharing a set-style name across slots (e.g.
    "Abyssal Immolator's …" on chest/head/hands/legs) are the tier set. Count
    equipped vs in-bags: set bonuses usually dwarf a 10–20 ilvl deficit, so
@@ -38,9 +37,11 @@ research runs — several high-value findings need no web at all.
    are options. Verify the bonus is live later via tier-proc damage sources
    in the logs.
 8. **Active loadout sanity** — compare the active `talents=` string against
-   the saved loadouts by exact/near match; a player raiding on their "M+"
-   loadout (or vice versa) is the cheapest DPS fix on any list. You can't
-   decode strings, but equality/similarity comparison needs no decoding.
+   the saved loadouts (exact match first, else decode both and diff the
+   selections); a player raiding on their "M+" loadout (or vice versa) is
+   the cheapest DPS fix on any list. The saved-loadout store
+   (`scripts/loadouts.sh`, see `references/talents.md`) may already name
+   the right build for tonight's target.
 9. **Trinket sanity vs sims** — look up both equipped trinkets (and any
    trinkets in `### Gear from Bags`) in `references/trinket-sims.tsv`
    (usage notes in `references/gear-intel.md` §5): grep the class+spec, read

@@ -11,6 +11,14 @@ tool's JSON document on stdout. The daemon is spawned on demand; segment ids are
 | `fight` | `{"segment_id":N, "view":"damage", "top":N}` | per-player meter rows: `player`, `class`, `spec`, `amount`, `per_sec`, `share_pct`, `crit_pct`, `events`, overkill/overheal. Views: damage, healing, interrupts, crowd_control, dispels, deaths. Omit segment_id for the live fight |
 | `breakdown` | `{"segment_id":N, "player":"name"}` | one player's per-ability rows (`amount`, `share_pct`, `hits`, `crit_pct`, `avg_hit`), per-target rows, and `timeline` (per-10s `dps` array + `marks`: trinket_use/trinket_proc/consumable/external_buff with `at_secs`). `"view":"deaths"` swaps in the death recap (`death_recap` rows with `health_after`) |
 | `compare` | `{"segment_id":N, "a":"name", "b":"name"}` | two players side by side: totals, per-ability tables, both timelines on one clock |
+| `talent_tree` | `{"spec_id":266}` | one spec's talent tree from local game data: nodes (position, type, ranks, gates, costs), choice entries with spell id/name/icon, hero subtrees, and `node_order` (large output — prefer decode/diff over dumping it) |
+| `decode_talents` | `{"string":"C…"}` | an import string decoded: spec, class, hero tree, every selected node with ranks/choice picks and spell names, plus `warnings` on build drift |
+| `encode_talents` | `{"spec_id":N, "selections":[{"node_id":N, "ranks":N, "choice_index":N, "granted":true}]}` | a fresh import string (zero tree hash; the game validates on import). Feed it a decode's selections to round-trip |
+
+The talent tools read `~/.local/share/wowdps/talents.json` (regenerate once
+per patch with wowdps' `tools/gen-talent-trees.sh`), never the daemon; a
+missing-dataset error names the fix. See `references/talents.md` for the
+coaching workflow around them.
 
 Player args accept a display name, case-insensitive prefix ("Tranq" matches
 "Tranqlock-Realm-US"), or GUID; a miss lists who was actually in the fight.

@@ -1,0 +1,624 @@
+<!doctype html>
+<!-- Talent-tree viewer TEMPLATE. scripts/render-talents.sh replaces the two
+     __PLACEHOLDER__ lines (dataset, loadouts) and writes the result to
+     ~/Documents/wow-coach/. The page is self-contained: it decodes the
+     import string(s) itself (serialization v2 codec, ported from the
+     wowdps-mcp Rust implementation), renders the class / spec / hero panes
+     as SVG from the extracted node positions, pulls node icons from the
+     wowhead CDN by extracted icon name (drawn initials when offline), and
+     diffs two loadouts when a compare string is given. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talent viewer</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --ink: #1b1f24;
+    --muted: #57606a;
+    --rule: #d0d7de;
+    --code-bg: #f6f8fa;
+    --accent: #0969da;
+    --warn-bg: #fff8c5;
+    --warn-border: #d4a72c;
+    --danger-bg: #ffebe9;
+    --danger-border: #cf222e;
+    --ok-bg: #dafbe1;
+    --ok-border: #1a7f37;
+    --manual-bg: #ddf4ff;
+    --manual-fg: #0969da;
+    --config-bg: #fbefff;
+    --config-fg: #8250df;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --ink: #e6edf3;
+      --muted: #9198a1;
+      --rule: #3d444d;
+      --code-bg: #151b23;
+      --accent: #4493f8;
+      --warn-bg: #2b2411;
+      --warn-border: #d29922;
+      --danger-bg: #2d1214;
+      --danger-border: #f85149;
+      --ok-bg: #0f2916;
+      --ok-border: #3fb950;
+      --manual-bg: #0c2d6b;
+      --manual-fg: #79c0ff;
+      --config-bg: #2c1a45;
+      --config-fg: #d2a8ff;
+    }
+  }
+
+  /* Must come after the media query: same specificity, so source order is what
+     lets an explicit "dark" win on a light system. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --ink: #e6edf3;
+    --muted: #9198a1;
+    --rule: #3d444d;
+    --code-bg: #151b23;
+    --accent: #4493f8;
+    --warn-bg: #2b2411;
+    --warn-border: #d29922;
+    --danger-bg: #2d1214;
+    --danger-border: #f85149;
+    --ok-bg: #0f2916;
+    --ok-border: #3fb950;
+    --manual-bg: #0c2d6b;
+    --manual-fg: #79c0ff;
+    --config-bg: #2c1a45;
+    --config-fg: #d2a8ff;
+  }
+
+  /* body MUST set both, or dark text lands on the browser's white default. */
+  body {
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  /* Fixed rather than inline so it stays reachable in a long document. Hidden
+     from print, where a theme control means nothing. */
+  #theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    color: var(--muted);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  #theme-toggle:hover { color: var(--ink); border-color: var(--muted); }
+  #theme-toggle svg { width: 1.05rem; height: 1.05rem; display: block; }
+
+  /* The icon shows the theme you would switch TO -- a moon on a light page, a
+     sun on a dark one. Both icons ship in the markup and CSS picks one, so
+     switching never waits on script. */
+  #theme-toggle .icon-sun { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) #theme-toggle .icon-sun { display: block; }
+    :root:not([data-theme="light"]) #theme-toggle .icon-moon { display: none; }
+  }
+  :root[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+  :root[data-theme="dark"] #theme-toggle .icon-moon { display: none; }
+  @media print { #theme-toggle { display: none; } }
+
+  body {
+    margin: 0;
+    font: 15px/1.5 system-ui, sans-serif;
+  }
+  main { max-width: 1280px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+  h1 { font-size: 1.3rem; margin: 0.25rem 0 0; }
+  h2 { font-size: 1rem; margin: 1.4rem 0 0.4rem; }
+  .sub { color: var(--muted); font-size: 0.85rem; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0 0.3em;
+    font-size: 0.85em;
+    white-space: nowrap;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  code[data-wrap] { white-space: normal; overflow-wrap: anywhere; }
+
+  #paste {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0.9rem 0;
+    flex-wrap: wrap;
+  }
+  #paste input[type=text] {
+    flex: 1 1 320px;
+    padding: 0.4rem 0.6rem;
+    font: 0.85rem/1.4 ui-monospace, monospace;
+    color: var(--ink);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+  #paste button {
+    padding: 0.4rem 0.9rem;
+    color: var(--ink);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #paste button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .banner {
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    margin: 0.6rem 0;
+  }
+  .banner.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .banner.danger { background: var(--danger-bg); border-color: var(--danger-border); }
+
+  #legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); margin: 0.4rem 0 0; }
+  #legend .chip { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 3px; vertical-align: -1px; margin-right: 0.3rem; border: 2px solid var(--rule); }
+  .chip.sel { border-color: var(--accent); }
+  .chip.grant { border-color: var(--ok-border); }
+  .chip.only-a { border-color: var(--danger-border); }
+  .chip.only-b { border-color: var(--warn-border); }
+
+  .panes { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+  .pane { flex: 1 1 340px; min-width: 300px; border: 1px solid var(--rule); border-radius: 8px; padding: 0.5rem 0.6rem 0.7rem; overflow-x: auto; }
+  .pane h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
+  .pane .sub { margin-bottom: 0.3rem; }
+  .pane svg { display: block; max-width: 100%; height: auto; }
+
+  #tip {
+    position: fixed;
+    display: none;
+    max-width: 340px;
+    padding: 0.5rem 0.7rem;
+    background: var(--code-bg);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    font-size: 0.82rem;
+    z-index: 20;
+    pointer-events: none;
+  }
+  #tip .t-name { font-weight: 600; }
+  #tip .t-meta { color: var(--muted); }
+
+  #lists { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  #lists ul { margin: 0.2rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; }
+  #lists a { color: var(--accent); text-decoration: none; }
+  #lists a:hover { text-decoration: underline; }
+  footer { margin-top: 2rem; font-size: 0.8rem; color: var(--muted); }
+  footer a { color: var(--accent); }
+</style>
+<script>
+  // In <head>, before any content renders: resolving the theme after first
+  // paint would show a flash of the wrong one.
+  //
+  // The system preference is not a mode the reader can see or select -- it is
+  // only the seed for the initial value. Once resolved, the theme is always an
+  // explicit light or dark, so the rest of the page never has to ask again.
+  (function () {
+    var saved = null;
+    try {
+      saved = localStorage.getItem("theme");
+    } catch (e) {
+      // Private mode, or file:// under a strict policy. The system preference
+      // below still applies; the choice just will not survive a reload.
+    }
+    if (saved !== "light" && saved !== "dark") {
+      saved = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    }
+    document.documentElement.setAttribute("data-theme", saved);
+  })();
+</script>
+</head>
+<body>
+<button id="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme">
+  <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+  <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+</button>
+<script>
+  // A plain two-way switch. The system preference decided the starting value
+  // in <head>; from here on the reader's own choice is the only input, and it
+  // is written to localStorage so it survives a reload.
+  (function () {
+    var button = document.getElementById("theme-toggle");
+    var root = document.documentElement;
+
+    function isDark() {
+      return root.getAttribute("data-theme") === "dark";
+    }
+
+    function describe() {
+      var next = isDark() ? "light" : "dark";
+      button.title = "Switch to " + next + " theme";
+      button.setAttribute("aria-label", button.title);
+    }
+
+    button.addEventListener("click", function () {
+      var next = isDark() ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try {
+        localStorage.setItem("theme", next);
+      } catch (e) {
+        // Non-persistent is still usable for this session.
+      }
+      describe();
+    });
+
+    // Track the system setting only until the reader overrides it -- after
+    // that their choice wins and changing the OS theme must not undo it.
+    if (window.matchMedia) {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function (e) {
+        var saved = null;
+        try { saved = localStorage.getItem("theme"); } catch (err) { /* ignore */ }
+        if (saved !== "light" && saved !== "dark") {
+          root.setAttribute("data-theme", e.matches ? "dark" : "light");
+          describe();
+        }
+      });
+    }
+
+    describe();
+  })();
+</script>
+
+<main>
+  <h1 id="title">Talent viewer</h1>
+  <div class="sub" id="subtitle"></div>
+
+  <div id="paste">
+    <input type="text" id="in-a" placeholder="Paste a talent import string…" spellcheck="false">
+    <input type="text" id="in-b" placeholder="Compare against (optional)…" spellcheck="false">
+    <button id="go" type="button">Render</button>
+  </div>
+
+  <div id="banners"></div>
+  <div id="legend"></div>
+  <div class="panes" id="panes"></div>
+
+  <div id="lists"></div>
+
+  <footer id="foot"></footer>
+</main>
+<div id="tip"></div>
+
+<script>
+const DATA = /*__TALENTS_JSON__*/ null;
+const LOADOUTS = /*__LOADOUTS__*/ [];
+</script>
+<script>
+"use strict";
+// ---- import-string codec (serialization v2), ported from wowdps-mcp ------
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function bitReader(str) {
+  const vals = [];
+  for (const ch of str.trim()) {
+    const i = ALPHABET.indexOf(ch);
+    if (i < 0) throw new Error("invalid import-string character " + JSON.stringify(ch));
+    vals.push(i);
+  }
+  let pos = 0;
+  return {
+    read(n) {
+      let out = 0;
+      for (let i = 0; i < n; i++) {
+        const idx = pos + i;
+        const g = vals[idx / 6 | 0];
+        if (g === undefined) throw new Error("import string truncated mid-value");
+        out |= ((g >> (idx % 6)) & 1) * Math.pow(2, i);
+      }
+      pos += n;
+      return out;
+    },
+    remaining() { return vals.length * 6 - pos; },
+  };
+}
+
+function findTree(specId) {
+  return (DATA.trees || []).find(t => (t.specs || []).some(s => s.specId === specId));
+}
+
+function decode(str) {
+  const r = bitReader(str);
+  const version = r.read(8);
+  if (version !== 2) throw new Error("serialization version " + version + ", expected 2");
+  const specId = r.read(16);
+  let hashZero = true;
+  for (let i = 0; i < 16; i++) if (r.read(8) !== 0) hashZero = false;
+  const tree = findTree(specId);
+  if (!tree) throw new Error("spec " + specId + " is not in the embedded dataset");
+  const byId = new Map(tree.nodes.map(n => [n.id, n]));
+  const selections = new Map();
+  const warnings = [];
+  let heroTree = null;
+  for (const nodeId of tree.nodeOrder) {
+    if (r.read(1) === 0) continue;
+    const node = byId.get(nodeId);
+    const purchased = r.read(1) === 1;
+    let ranks = 1, choice = null, granted = !purchased;
+    if (purchased) {
+      const partially = r.read(1) === 1;
+      ranks = partially ? r.read(6) : (node ? node.maxRanks : 1);
+      if (r.read(1) === 1) choice = r.read(2);
+    }
+    if (!node) { warnings.push("selected node " + nodeId + " missing from dataset (build drift?)"); continue; }
+    const entry = choice !== null ? (node.entries || [])[choice] : (node.entries || [])[0];
+    if (entry && entry.subTreeId) {
+      const sub = (tree.subTrees || []).find(s => s.id === entry.subTreeId);
+      heroTree = { id: entry.subTreeId, name: sub ? sub.name : "" };
+    }
+    selections.set(nodeId, { ranks, choice, granted, entry });
+  }
+  if (r.remaining() >= 6) warnings.push(r.remaining() + " unread bits — string and dataset disagree on tree shape");
+  if (!hashZero) warnings.push("string carries a tree hash; matched by node id, not validated against it");
+  const spec = (tree.specs || []).find(s => s.specId === specId) || { name: "?" };
+  return { specId, spec: spec.name, class: tree.className, tree, selections, heroTree, warnings };
+}
+
+// ---- rendering ------------------------------------------------------------
+const ICON_CDN = "https://wow.zamimg.com/images/wow/icons/large/";
+const CELL = 46, ICON = 34;
+
+function paneOf(tree, node) {
+  if (node.subTreeId) return "hero";
+  if (node.type === "subtree") return "none"; // the hero pick shows in the title
+  // Currencies sorted by index: first is class points, second spec points,
+  // the rest hero-tree points (indices are 1-based in current data).
+  const curs = (tree.currencies || []).slice().sort((x, y) => x.index - y.index);
+  const cost = (node.costs || [])[0];
+  if (cost && curs.length) {
+    if (curs[0] && cost.currency === curs[0].id) return "class";
+    if (curs[1] && cost.currency === curs[1].id) return "spec";
+    return "hero";
+  }
+  // Costless (granted) nodes: fall back to the horizontal midpoint.
+  const xs = tree.nodes.filter(n => !n.subTreeId).map(n => n.posX);
+  return node.posX <= (Math.min(...xs) + Math.max(...xs)) / 2 ? "class" : "spec";
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function nodeState(nodeId, a, b) {
+  const inA = a && a.selections.has(nodeId);
+  const inB = b && b.selections.has(nodeId);
+  if (b) {
+    if (inA && !inB) return "only-a";
+    if (!inA && inB) return "only-b";
+    if (inA && inB) {
+      const x = a.selections.get(nodeId), y = b.selections.get(nodeId);
+      if (x.ranks !== y.ranks || x.choice !== y.choice) return "changed";
+      return "both";
+    }
+    return "off";
+  }
+  if (!inA) return "off";
+  return a.selections.get(nodeId).granted ? "grant" : "sel";
+}
+
+const STATE_STYLE = {
+  "sel":     { stroke: "var(--accent)", width: 2.5, dim: false },
+  "grant":   { stroke: "var(--ok-border)", width: 2.5, dim: false },
+  "both":    { stroke: "var(--accent)", width: 2.5, dim: false },
+  "only-a":  { stroke: "var(--danger-border)", width: 3, dim: false },
+  "only-b":  { stroke: "var(--warn-border)", width: 3, dim: false },
+  "changed": { stroke: "var(--config-fg)", width: 3, dim: false },
+  "off":     { stroke: "var(--rule)", width: 1.2, dim: true },
+};
+
+function renderPane(tree, nodes, a, b, title, subtitle) {
+  if (!nodes.length) return null;
+  const minX = Math.min(...nodes.map(n => n.posX)), maxX = Math.max(...nodes.map(n => n.posX));
+  const minY = Math.min(...nodes.map(n => n.posY)), maxY = Math.max(...nodes.map(n => n.posY));
+  // Game grid units are ~600 per column; scale to cells, keep sub-column offsets.
+  const sx = p => ((p - minX) / 600) * CELL + CELL / 2 + 4;
+  const sy = p => ((p - minY) / 600) * CELL + CELL / 2 + 4;
+  const w = sx(maxX) + CELL / 2 + 4, h = sy(maxY) + CELL / 2 + 4;
+  const here = new Set(nodes.map(n => n.id));
+  let edges = "", imgs = "";
+  for (const n of nodes) {
+    for (const to of (n.next || [])) {
+      if (!here.has(to)) continue;
+      const t = nodes.find(m => m.id === to);
+      const on = a && a.selections.has(n.id) && a.selections.has(to);
+      edges += '<line x1="' + sx(n.posX) + '" y1="' + sy(n.posY) + '" x2="' + sx(t.posX) + '" y2="' + sy(t.posY) +
+        '" stroke="' + (on ? "var(--accent)" : "var(--rule)") + '" stroke-width="' + (on ? 2 : 1) + '"/>';
+    }
+  }
+  for (const n of nodes) {
+    const st = nodeState(n.id, a, b);
+    const s = STATE_STYLE[st];
+    const selA = a && a.selections.get(n.id);
+    const entry = (selA && selA.entry) || (n.entries || [])[0] || {};
+    const x = sx(n.posX) - ICON / 2, y = sy(n.posY) - ICON / 2;
+    const rx = n.type === "choice" || n.type === "subtree" ? ICON / 2 : 6;
+    const dim = s.dim ? ' opacity="0.35"' : "";
+    imgs += '<g class="node" data-node="' + n.id + '"' + dim + ">";
+    imgs += '<clipPath id="c' + title.replace(/\W/g, "") + n.id + '"><rect x="' + x + '" y="' + y + '" width="' + ICON + '" height="' + ICON + '" rx="' + rx + '"/></clipPath>';
+    if (entry.icon) {
+      imgs += '<image href="' + ICON_CDN + esc(entry.icon) + '.jpg" x="' + x + '" y="' + y + '" width="' + ICON + '" height="' + ICON +
+        '" clip-path="url(#c' + title.replace(/\W/g, "") + n.id + ')" preserveAspectRatio="xMidYMid slice"/>';
+    }
+    imgs += '<rect x="' + x + '" y="' + y + '" width="' + ICON + '" height="' + ICON + '" rx="' + rx +
+      '" fill="' + (entry.icon ? "none" : "var(--code-bg)") + '" stroke="' + s.stroke + '" stroke-width="' + s.width + '"/>';
+    if (!entry.icon) {
+      imgs += '<text x="' + (x + ICON / 2) + '" y="' + (y + ICON / 2 + 4) + '" text-anchor="middle" font-size="13" fill="var(--muted)">' +
+        esc((entry.name || "?").slice(0, 1)) + "</text>";
+    }
+    if (selA && n.maxRanks > 1) {
+      imgs += '<text x="' + (x + ICON) + '" y="' + (y + ICON + 2) + '" text-anchor="end" font-size="9" font-weight="700" ' +
+        'fill="var(--ink)" stroke="var(--bg)" stroke-width="2.5" paint-order="stroke">' + selA.ranks + "/" + n.maxRanks + "</text>";
+    }
+    imgs += "</g>";
+  }
+  const pane = document.createElement("div");
+  pane.className = "pane";
+  pane.innerHTML = "<h3>" + esc(title) + "</h3>" + (subtitle ? '<div class="sub">' + esc(subtitle) + "</div>" : "") +
+    '<svg viewBox="0 0 ' + w + " " + h + '" width="' + w + '" height="' + h + '">' + edges + imgs + "</svg>";
+  return pane;
+}
+
+// ---- tooltips --------------------------------------------------------------
+function attachTips(container, tree, a, b) {
+  const tip = document.getElementById("tip");
+  const byId = new Map(tree.nodes.map(n => [n.id, n]));
+  container.addEventListener("mousemove", e => {
+    const g = e.target.closest("g.node");
+    if (!g) { tip.style.display = "none"; return; }
+    const n = byId.get(Number(g.dataset.node));
+    if (!n) { tip.style.display = "none"; return; }
+    const selA = a && a.selections.get(n.id);
+    const selB = b && b.selections.get(n.id);
+    const entry = (selA && selA.entry) || (n.entries || [])[0] || {};
+    let html = '<div class="t-name">' + esc(entry.name || "(unnamed)") + "</div>";
+    html += '<div class="t-meta">' + esc(n.type) + (n.maxRanks > 1 ? " · " + n.maxRanks + " ranks" : "") +
+      (n.reqPoints ? " · needs " + n.reqPoints + " pts" : "") + (entry.spellId ? " · spell " + entry.spellId : "") + "</div>";
+    if ((n.entries || []).length > 1 && n.type !== "subtree") {
+      html += '<div class="t-meta">choice: ' + n.entries.map((en, i) =>
+        (selA && selA.choice === i ? "▸ " : "") + esc(en.name || en.subTreeId || "?")).join(" / ") + "</div>";
+    }
+    if (selA) html += '<div>this build: ' + (selA.granted ? "granted" : selA.ranks + "/" + n.maxRanks) +
+      (selA.choice !== null && selA.entry ? " — " + esc(selA.entry.name || "") : "") + "</div>";
+    if (b) html += "<div>compare: " + (selB ? (selB.granted ? "granted" : selB.ranks + "/" + n.maxRanks) +
+      (selB.choice !== null && selB.entry ? " — " + esc(selB.entry.name || "") : "") : "not taken") + "</div>";
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    const pad = 14;
+    let tx = e.clientX + pad, ty = e.clientY + pad;
+    const r = tip.getBoundingClientRect();
+    if (tx + r.width > innerWidth - 8) tx = e.clientX - r.width - pad;
+    if (ty + r.height > innerHeight - 8) ty = e.clientY - r.height - pad;
+    tip.style.left = tx + "px";
+    tip.style.top = ty + "px";
+  });
+  container.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+}
+
+// ---- page assembly ---------------------------------------------------------
+function banner(kind, text) {
+  const d = document.createElement("div");
+  d.className = "banner " + kind;
+  d.textContent = text;
+  document.getElementById("banners").appendChild(d);
+}
+
+function render() {
+  document.getElementById("banners").innerHTML = "";
+  document.getElementById("panes").innerHTML = "";
+  document.getElementById("lists").innerHTML = "";
+  document.getElementById("legend").innerHTML = "";
+  const strA = document.getElementById("in-a").value.trim();
+  const strB = document.getElementById("in-b").value.trim();
+  if (!DATA) { banner("danger", "No talent dataset embedded — regenerate this page."); return; }
+  if (!strA) return;
+  let a, b = null;
+  try { a = decode(strA); } catch (e) { banner("danger", "Primary string: " + e.message); return; }
+  if (strB) {
+    try {
+      b = decode(strB);
+      if (b.specId !== a.specId) { banner("warn", "Compare string is " + b.spec + " " + b.class + " — different spec, ignoring it."); b = null; }
+    } catch (e) { banner("warn", "Compare string: " + e.message); }
+  }
+  const tree = a.tree;
+  document.getElementById("title").textContent = a.spec + " " + a.class + (a.heroTree ? " — " + a.heroTree.name : "");
+  document.getElementById("subtitle").textContent =
+    "WoW build " + (DATA.build || "?") + " · " + a.selections.size + " nodes selected" +
+    (b ? " · compared against a second loadout (" + b.selections.size + " nodes)" : "");
+  for (const w of a.warnings) banner("warn", w);
+
+  const legend = document.getElementById("legend");
+  legend.innerHTML = b
+    ? '<span><span class="chip sel"></span>both builds</span>' +
+      '<span><span class="chip only-a"></span>only this build</span>' +
+      '<span><span class="chip only-b"></span>only compare</span>' +
+      '<span><span class="chip" style="border-color: var(--config-fg)"></span>rank/choice differs</span>'
+    : '<span><span class="chip sel"></span>selected</span>' +
+      '<span><span class="chip grant"></span>granted</span>' +
+      '<span><span class="chip"></span>not taken</span>';
+
+  const spec = s => !s.visibleFor || s.visibleFor.includes(a.specId);
+  const classNodes = tree.nodes.filter(n => spec(n) && paneOf(tree, n) === "class");
+  const specNodes = tree.nodes.filter(n => spec(n) && paneOf(tree, n) === "spec");
+  const heroId = a.heroTree ? a.heroTree.id : null;
+  const heroNodes = tree.nodes.filter(n => n.subTreeId && (heroId ? n.subTreeId === heroId : false));
+  const panes = document.getElementById("panes");
+  const p1 = renderPane(tree, classNodes, a, b, a.class, "class tree");
+  const p2 = renderPane(tree, specNodes, a, b, a.spec, "spec tree");
+  const p3 = renderPane(tree, heroNodes, a, b, a.heroTree ? a.heroTree.name : "Hero", "hero talents");
+  for (const p of [p1, p2, p3]) if (p) panes.appendChild(p);
+  attachTips(panes, tree, a, b);
+
+  // Selected-talent list, linked to wowhead (hover tooltips when online).
+  const lists = document.getElementById("lists");
+  const groups = [["Class", classNodes], ["Spec", specNodes], ["Hero", heroNodes]];
+  for (const [label, nodes] of groups) {
+    const taken = nodes.filter(n => a.selections.has(n.id));
+    if (!taken.length) continue;
+    const d = document.createElement("div");
+    d.innerHTML = "<h2>" + esc(label) + " picks</h2><ul>" + taken.map(n => {
+      const s = a.selections.get(n.id);
+      const en = s.entry || {};
+      const link = en.spellId
+        ? '<a href="https://www.wowhead.com/spell=' + en.spellId + '" target="_blank" rel="noopener">' + esc(en.name || en.spellId) + "</a>"
+        : esc(en.name || "node " + n.id);
+      return "<li>" + link + (n.maxRanks > 1 ? " <span class='sub'>" + s.ranks + "/" + n.maxRanks + "</span>" : "") + "</li>";
+    }).join("") + "</ul>";
+    lists.appendChild(d);
+  }
+
+  document.getElementById("foot").innerHTML =
+    'Cross-check on <a href="https://www.wowhead.com/talent-calc/blizzard/' + encodeURIComponent(strA) +
+    '" target="_blank" rel="noopener">wowhead</a> · icons from the wowhead CDN (offline: initials) · ' +
+    'string: <code data-wrap>' + esc(strA) + "</code>";
+}
+
+document.getElementById("go").addEventListener("click", render);
+for (const id of ["in-a", "in-b"]) {
+  document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") render(); });
+}
+(function init() {
+  const a = LOADOUTS[0], b = LOADOUTS[1];
+  if (a) document.getElementById("in-a").value = a.string || "";
+  if (b) document.getElementById("in-b").value = b.string || "";
+  render();
+})();
+</script>
+</body>
+</html>

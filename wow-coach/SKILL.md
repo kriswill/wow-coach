@@ -48,7 +48,10 @@ and the indexed-fight count.
 - **SimC paste** (if offered, or ask once): mine it per
   `references/simc-input.md`. Deliver the free wins immediately (missing
   enchants, never-filled slots, bag upgrades, banked catalyst charges) —
-  they cost nothing and build trust before any judgment lands.
+  they cost nothing and build trust before any judgment lands. Decode the
+  paste's `talents=` string with the `decode_talents` MCP tool and check
+  it against the saved per-encounter loadouts (`references/talents.md`) —
+  raiding on the M+ build is the cheapest fix on any list.
 - **Context**: raid progression night vs farm vs M+ changes the reporting
   policy (see rubric). Ask only if the fights themselves don't make it
   obvious.
@@ -59,7 +62,9 @@ Launch the research agents described in `references/research-agents.md` —
 spec reference, benchmarks, gear intelligence (BiS map keyed by drop source,
 boss shopping list, crafting guidance, per-spec stat priorities + bag audit;
 see `references/gear-intel.md`), and (when loadouts or a target boss are
-known) per-boss talent analysis. Do not block on them: pre-flight findings
+known) per-boss talent analysis — hand agents the DECODED selections from
+`decode_talents`, not raw strings, per `references/talents.md`. Do not
+block on them: pre-flight findings
 and first-fight reads proceed meanwhile. Fold results into a session rubric
 and a gear-intel note as they land. **The evidence hierarchy in
 `references/analysis-rubric.md` is binding** — guide prose never drives a
@@ -121,3 +126,4 @@ repo.
 | `references/trinket-sims.tsv` | when judging any trinket (paste review, drop call, bag audit) — grep the player's class+spec for bloodmallet's ranked ilvl→DPS sim data; refresh per patch via `scripts/fetch-trinket-sims.sh` |
 | `references/secondary-sims.tsv` | when judging a stat mix (paste review, gem/enchant choice, regem question) — bloodmallet's best crit/haste/mastery/vers splits per spec at 1/3/5 targets; refresh per patch via `scripts/fetch-secondary-sims.sh` |
 | `references/game-facts-midnight-12.1.md` | before any enchant/catalyst/cooldown claim — player-verified 12.1 mechanics that OUTRANK guides and research agents; append new verified facts here, re-verify on patch change |
+| `references/talents.md` | whenever talents come up — decoding/encoding import strings (MCP `decode_talents`/`encode_talents`/`talent_tree`), rendering the graphical tree (`scripts/render-talents.sh`), and the per-encounter loadout store (`scripts/loadouts.sh`); dataset refreshed per patch via wowdps `gen-talent-trees.sh` or `scripts/fetch-talents-fallback.sh` |
