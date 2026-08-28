@@ -25,7 +25,10 @@ find_mcp() {
 }
 
 MCP=$(find_mcp)
-reply=$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":%s}}\n' "$tool" "$args" \
+# Modern-era MCP (2026-07-28): stateless, no initialize handshake; every
+# request names its protocol revision in params._meta.
+meta='{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}'
+reply=$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":%s,"_meta":%s}}\n' "$tool" "$args" "$meta" \
   | timeout "${MCP_TIMEOUT:-25}" "$MCP")
 
 if [ -z "$reply" ]; then
