@@ -2,7 +2,10 @@
 
 The paste is a full machine-readable character: equipped gear, bags,
 currencies, professions, and every saved talent loadout. Mine it before any
-research runs — several high-value findings need no web at all.
+research runs — several high-value findings need no web at all. The
+`loadout` MCP tool supersedes it for *equipped* gear and *active* talents
+in a logged fight, but only the paste sees bags, currencies, professions,
+and the saved-loadout collection — the two are complements, not rivals.
 
 ## Free wins to scan for (each was a real finding)
 
@@ -53,10 +56,19 @@ research runs — several high-value findings need no web at all.
 
 ## Cross-checks against the logs
 
+- **The `loadout` MCP tool is the primary receipt**: for any instance
+  fight it returns the gear and talents the player ACTUALLY had in that
+  encounter (item ids per slot with enchants/gems, named talent selections
+  with an import string). Diff it against the paste first — matching item
+  ids and talent string mean the paste is current; any mismatch means the
+  paste is stale, and grading follows the loadout. It's per-fight, so an
+  "I equipped it / I respecced" claim is settled by querying the next
+  pull's segment.
 - Trinkets in the paste vs `trinket_proc`/`trinket_use` marks in breakdowns:
   a looted-but-unequipped trinket shows up as the OLD trinket's procs still
-  firing. Same for any "I equipped it" claim — the logs are the receipt.
+  firing — the behavioral cross-check when a fight predates the swap or
+  `loadout` returns `logged: false`.
 - Max HP in death recaps (`health_after.max`) should match the paste's
   health — confirms you're reading the right character.
-- A talent/build change claim is verified by a new damage-source name
+- A talent/build change claim is also visible as a new damage-source name
   appearing (or an old one vanishing) in the next pull's breakdown.

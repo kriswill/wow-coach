@@ -7,8 +7,10 @@ tables below, so lookups during the raid cost nothing.
 
 ## 1. BiS list, keyed by source
 
-Have the agent produce the current BiS / near-BiS list for the player's
-class + active spec — from MythicSim-style sim rankings, murlok/archon
+The player's current slot occupants come from the `loadout` MCP tool on a
+recent instance fight (item ids, ilvls, enchants, gems per slot — no paste
+needed; a SimC paste adds the bag/currency picture). Have the agent produce
+the current BiS / near-BiS list for the player's class + active spec — from MythicSim-style sim rankings, murlok/archon
 top-player usage, and Method/Wowhead BiS guides — and **key every item by
 where it drops** (boss + instance, dungeon, crafted, vendor). Rank items
 within each slot; note the sim-vs-usage disagreements rather than papering
@@ -27,8 +29,10 @@ uses:
 clearly approaching one (trash segments named after it, prior boss just
 died), check the shopping list — if a wanted item drops there, tell the
 player *before or right after the kill*, one line: item, why, over what.
-A looted-but-unequipped upgrade is caught by the logs (old trinket's procs
-still firing) — call that out too.
+Verify the equip on the next pull with the `loadout` MCP tool (the item
+id is in the slot or it isn't — shopping-list items are keyed by item id
+for exactly this); a looted-but-unequipped upgrade also shows in the logs
+as the old trinket's procs still firing — call that out too.
 
 ## 3. Crafting guidance
 

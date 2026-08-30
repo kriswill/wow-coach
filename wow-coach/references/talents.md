@@ -9,8 +9,17 @@ hierarchy this dataset ranks with logs — it IS the client's data. Guides
 and research agents still rank below it: they may argue a *choice* of
 talents, never what a tree contains.
 
-## The three MCP tools (shapes in `references/mcp-tools.md`)
+## The four MCP tools (shapes in `references/mcp-tools.md`)
 
+- `loadout {segment_id, player}` — the build the player ACTUALLY ran in
+  one fight, from the log's COMBATANT_INFO: named talent selections with
+  hero tree and a ready-to-import string (raw node/entry/rank picks with a
+  note when the dataset misses the spec; rank 0 = granted), plus equipped
+  gear per slot (item_id, ilvl, enchants, gems, bonus_ids, `avg_ilvl`).
+  Per-encounter by construction — query the segment you're grading, not
+  one from earlier in the night. `logged: false` means the fight was
+  outside an instance, not an error. Unlike the other three this one
+  talks to the daemon.
 - `decode_talents {string}` — the first thing to do with any `talents=`
   line or pasted string: spec, hero tree, and every selected node with
   ranks/choice picks, named. Non-empty `warnings` mean build drift (string
@@ -22,7 +31,7 @@ talents, never what a tree contains.
   points, or choice alternatives. Large; prefer decode output when the
   question is about one build.
 
-No daemon is needed for these; they read the dataset file. Without a game
+No daemon is needed for the string tools; they read the dataset file. Without a game
 install, `scripts/fetch-talents-fallback.sh` snapshots an equivalent
 dataset to `references/talents-fallback.json` (raidbots nodes + wago.tools
 walk order); point `WOWDPS_TALENTS` at it for MCP use, and the render
@@ -60,26 +69,39 @@ between patches; the string may import incomplete).
 
 Coaching flow that makes the store earn its keep:
 
-1. **Intake**: decode the SimC paste's active `talents=` line; offer to
-   save it under tonight's target (`raid-boss "Boss Name"`).
+1. **Intake**: pull `loadout` on the latest instance fight (and/or decode
+   the SimC paste's active `talents=` line); offer to save the string
+   under tonight's target (`raid-boss "Boss Name"`). When loadout and
+   paste disagree, the loadout is what was actually played — the paste is
+   stale.
 2. **Pre-pull**: when the fight-watch shows a shopping-list boss
-   approaching and the store holds a loadout for it, check the active
-   string matches (`get` → exact string compare against the paste, or
-   decode-and-diff). A mismatch is a one-line pre-brief, same as loot
+   approaching and the store holds a loadout for it, check what the
+   player is actually on (`loadout` of the last pull's segment, falling
+   back to the paste) against `get` — exact string compare, or
+   decode-and-diff. A mismatch is a one-line pre-brief, same as loot
    calls: "you're on your M+ build; 'Ashen Warden' loadout is saved —
    swap before pull."
-3. **Post-session**: a talent finding that survived the rubric becomes an
+3. **Per-fight**: `loadout` is scoped to its segment, so a swap claim is
+   verified by re-querying the next pull — the import string changes or
+   it doesn't. A wipe on the wrong build is a finding the meter alone
+   can't show.
+4. **Post-session**: a talent finding that survived the rubric becomes an
    encoded string + a saved loadout + a rendered diff page, not prose.
    Never push a mid-raid respec on unverified claims (Conduct rules
    apply); loadout changes are between-fights or homework.
-4. **Per-boss research**: hand research agents the *decoded* selections,
-   not the raw string — they compare intent (choice nodes, capstones)
+5. **Per-boss research**: hand research agents the *decoded* selections,
+   not the raw string — preferring `loadout`'s named selections from the
+   actual encounter — they compare intent (choice nodes, capstones)
    against published builds and cite disagreements node-by-node.
 
 ## Ground rules
 
 - The dataset outranks guides on tree *structure*; player-verified facts
   (`references/game-facts-*.md`) outrank everything on *mechanics*.
+- `loadout` output IS the log — level-1 evidence on what was worn and
+  talented in that fight. It outranks a SimC paste, a saved store entry,
+  and any "I swapped" claim; when they disagree, flag the drift and grade
+  against the loadout.
 - Decode warnings are findings, not noise: a string that no longer walks
   the tree cleanly is how "my build broke after the patch" looks.
 - Re-run the extractor (or the fallback fetcher) on every game patch,

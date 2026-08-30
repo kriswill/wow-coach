@@ -45,6 +45,9 @@ consumables.**
    same fight, same buffs. Use `compare`; diff ability tables and curves and
    name the gap's components (a missing damage source = talent/gear; equal
    avg-hit but half the casts = resource flow; fewer peaks = cooldown usage).
+   When the gap smells like build, pull `loadout` for both players on that
+   segment — ilvl, tier count, trinkets, and hero tree name the gear/talent
+   share of the gap in hard numbers before any rotation lecture.
 3. **Other DPS in the same run.** In a 5-man, flag <80% of the other DPS's
    mean on boss segments. In a raid, compare against the DPS median, and
    normalize for time-alive before judging.
@@ -70,7 +73,10 @@ consumables.**
 
 A coaching claim is only as good as its evidence class:
 
-1. **The player's own logs** — measured. Findings here are solid.
+1. **The player's own logs** — measured. Findings here are solid. This
+   level includes the `loadout` MCP tool's per-encounter gear and talents
+   (COMBATANT_INFO): what was actually worn and talented in the graded
+   fight, outranking any SimC paste or player recollection of it.
 2. **Node-level meta data** — murlok.io top-50 talent pick rates, archon.gg
    parse aggregation, MythicSim rankings. Trustworthy for "what the meta
    actually does".

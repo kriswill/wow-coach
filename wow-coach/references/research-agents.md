@@ -38,9 +38,12 @@ item pages, maxroll/icy-veins for crafting.
 
 Ask the agent for the guide-published per-boss build recommendations AND the
 node-level reality (archon.gg per-boss talent trees, murlok top-player
-builds). Compare against the player's saved loadouts by *name and intent*
-(players often keep boss-named loadouts); flag only differences confirmed at
-node level. Export strings must be captured verbatim from a rendered guide
+builds). The player's side of the comparison comes from the `loadout` MCP
+tool on the actual encounter segment (named selections + hero tree — what
+was really run on that boss), falling back to their saved loadouts by *name
+and intent* (players often keep boss-named loadouts); hand the agent the
+decoded/named selections, never raw strings, and flag only differences
+confirmed at node level. Export strings must be captured verbatim from a rendered guide
 page — an agent that cannot extract one must say so, never reconstruct.
 
 ## The honesty rules (bake them into every prompt)
