@@ -39,8 +39,12 @@ consumables.**
 ## Benchmarks — in order of trust
 
 1. **The player's own prior pulls** (trend). Always available, immune to
-   gear/comp noise. Track per-fight: DPS, key-ability shares, death grade,
-   potion count. Improvement claims cite this.
+   gear/comp noise. The DPS line comes from the history store's `trend`
+   tool scoped to the same encounter AND difficulty (Normal 14 / Heroic 15
+   / Mythic 16 / keystone 8 — never mix them); pulls-to-kill and median
+   kill time from `progression`; the best kill from `history`
+   `sort:"fastest"`. Track per-fight on top of that: key-ability shares,
+   death grade, potion count. Improvement claims cite this, with dates.
 2. **Same-spec player in the same run.** The gold standard when present —
    same fight, same buffs. Use `compare`; diff ability tables and curves and
    name the gap's components (a missing damage source = talent/gear; equal

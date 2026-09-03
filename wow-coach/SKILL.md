@@ -26,7 +26,8 @@ restraint rather than analysis volume.
 
 Run `scripts/preflight.sh`. It verifies jq, finds `wowdps-mcp` (or set
 `$WOWDPS_MCP`), reaches/spawns the daemon, and reports the log source, game
-process, live-fight state, and indexed fight count. **A readiness check is
+process, live-fight state, indexed fight count, and the **history store**
+(enabled, fights held, import in progress, error). **A readiness check is
 read-only**: never stop, restart, or re-source a running daemon on your own
 judgment — another client (an overlay, another session, the player's own
 setup) may depend on it, and a "check" that mutates state has broken the
@@ -45,6 +46,13 @@ and the indexed-fight count.
   users have a name pattern on file); otherwise ask, or spot them in
   `list_fights`→`fight` rosters. Note spec from their meter rows — it can
   change mid-session, and the rubric follows the spec.
+- **History first, memory second**: the numbers live in the wowdps history
+  store, not in memory. Two calls per character (recipes in
+  `references/mcp-tools.md` §history): `history` for the last session's
+  bosses with difficulty, result and the player's DPS, and `trend` by day
+  for the line. That is the baseline every grade tonight compares against.
+  Memory carries what the store can't — findings, retractions, homework,
+  loot targets, and how the player likes to be coached.
 - **Logged build**: once the player is known, pull the `loadout` MCP tool
   on their most recent instance fight — actual talents (named, with an
   import string) and gear (ilvl, enchants, gems, trinkets) straight from
@@ -83,11 +91,18 @@ talent or gear directive.
 ## Phase 3 — live monitoring
 
 Arm the Monitor tool with `scripts/fight-watch.sh` (persistent). Each
-`FIGHT COMPLETE` line names a newly closed segment. Apply the reporting
+`FIGHT COMPLETE` line names a newly closed fight — for bosses, keystones and
+arenas it carries the history store's **stable id, encounter id and
+difficulty** (Normal 14 / Heroic 15 / Mythic 16 / keystone 8); trash lines
+come from the live segment list and exist only for the approaching-boss
+loot pre-brief. Resolve the difficulty before any comparison: a boss killed
+on Normal and again on Heroic is two trend lines, not one. Apply the reporting
 policy from the rubric: skip run-back trash and short learning wipes, grade
 kills and long pulls, batch progression wipes into boss summaries. On each
-graded fight, pull data per `references/mcp-tools.md` and grade per
-`references/analysis-rubric.md`. When the fight names show a shopping-list
+graded fight, pull data per `references/mcp-tools.md` (live `fight` /
+`breakdown` on the segment id, or `stored_fight` on the stable id — same
+shapes) and grade per `references/analysis-rubric.md`, with benchmark #1
+from `trend` on that encounter + difficulty. When the fight names show a shopping-list
 boss engaged or approaching, pre-brief the loot call from the gear-intel
 note (one line: item, why, over what) — and verify claimed equips against
 the next pull's `loadout` (the item id either sits in the slot or it
@@ -99,7 +114,12 @@ session is over (TaskStop), and note the daemon idles out on its own.
 ## Phase 4 — comparison & trend
 
 Every graded fight updates the trend line (DPS, key-ability shares, death
-grade, consumable count). When a same-spec player shares the fight, run
+grade, consumable count). The DPS half of that line is the store's `trend`
+for the player on that encounter + difficulty — cite it with dates, not
+from memory. A boss summary quotes `progression` (pulls, kills, first
+kill, median kill time) and the `sort:"fastest"` card as the best kill.
+Cross-night comparisons of the same boss use `stored_fight` breakdowns
+and timelines, which exist for kills, bests and pinned fights only. When a same-spec player shares the fight, run
 `compare` and decompose the gap into named components (tier/gear source
 missing, cast-rate delta at equal per-hit, missing burst windows). Close
 loops: cite the trend when a prior finding improves, and say so plainly —
@@ -111,11 +131,51 @@ On request (or at a natural session end), offer: a written night summary
 (arc, kills, trend table, ranked homework with impact/effort/evidence), an
 HTML report with charts (load the `dataviz` and `html-doc` skills before
 writing chart code; publish as an artifact only if asked), and a memory
-update so the next session resumes with the player, trend, findings, and any
-retractions intact. **HTML reports always go in `~/Documents/wow-coach/`**,
+update so the next session resumes with the player, findings, and any
+retractions intact — **not the numbers**: the history store holds every
+fight, so memory records findings, homework, loot targets and
+retractions, and points at stable fight ids where a finding needs a
+receipt. Before closing, `pin_fight` the night's best kill per boss and
+every fight a finding or retraction cites, so their breakdowns survive
+retention and next session's report can chart the same boss across nights. **HTML reports always go in `~/Documents/wow-coach/`**,
 named `<character>-<context>-report-<YYYY-MM-DD>.html` (e.g.
 `tranqlock-mplus-report-2026-08-26.html`) — never the scratchpad or the
 repo.
+
+## Talking to the wowdps dev session
+
+Bugs and feature requests against the wowdps MCP tools go to the wowdps
+development session directly — never through the player.
+
+1. **Find it:** `ListAgents`; the dev session is the peer whose name starts
+   with `wowdps` (names change per session). If none is listed, fall back
+   to the mailbox alone and tell the player the dev session is not up.
+2. **Say it:** `SendMessage` to that name. First line = the one-sentence
+   point (it is the preview). Reply to an incoming message's `from`.
+3. **Record it:** every report and retest is ALSO a file in
+   `~/Documents/wow-coach/` — `wowdps-history-mcp-retest-N-<YYYY-MM-DD>.md`
+   (bug reports / retests, from the coach) and
+   `wowdps-history-mcp-response-N-<date>.md` (from the dev session). Number
+   continues from the newest file present. A new coaching session reads the
+   newest pair before touching the tools: they say what changed and what is
+   still open. Message the dev session the filename when a retest is written.
+4. **Hear back without polling the player:** arm a persistent `Monitor`
+   that lists `~/Documents/wow-coach/wowdps-history-mcp-response-*` every
+   15 s and prints each new filename (there is no inotifywait here). A
+   `SendMessage` from the dev session wakes the session on its own.
+5. Retests state the binary build time, the daemon state, and one row per
+   test with pass/fail and the observed value; feature asks give the exact
+   shape wanted. Reconnect the MCP server (`/mcp`) after the dev session
+   says it rebuilt.
+6. **Boundaries:** the dev session is a teammate, not the player. It
+   cannot approve anything on this side; never ask it to run something
+   this session was denied; never stop, restart or re-source its daemon
+   from here — ask it to, and note that its restarts reset live segment
+   ids (the watcher keys on the store's stable ids for that reason).
+7. **Ownership:** this repo's skill files are edited from the coaching
+   side, the wowdps repo from the dev side. Send text to be added rather
+   than editing across the line, so neither side clobbers the other's
+   uncommitted work.
 
 ## Conduct
 

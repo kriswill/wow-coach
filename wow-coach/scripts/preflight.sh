@@ -46,4 +46,23 @@ else
   say WARN "log has no fights yet — if the player has been in combat, combat logging is probably OFF in-game (/combatlog)"
 fi
 
+# History store (fights that persist across logins). Coaching without it
+# falls back to memory for the trend line; an error blocks nothing but
+# every "vs your own prior pulls" claim, so surface it loudly.
+henabled=$(jq -r '.history.enabled // "absent"' <<<"$status")
+hfights=$(jq -r '.history.fights // 0' <<<"$status")
+himporting=$(jq -r '.history.importing // 0' <<<"$status")
+herror=$(jq -r '.history.error // empty' <<<"$status")
+if [ "$henabled" = "absent" ]; then
+  say WARN "history store not reported by this daemon (pre-history build?) — trend/progression tools unavailable, memory is the only baseline"
+elif [ "$henabled" != "true" ]; then
+  say WARN "history store disabled (history_* keys in ~/.config/wowdps/config.toml) — no cross-session trend"
+elif [ -n "$herror" ]; then
+  say FAIL "history store error: $herror"
+  fail=1
+else
+  extra=""; [ "$himporting" -gt 0 ] 2>/dev/null && extra=" (still importing $himporting older logs — early trend calls may be incomplete)"
+  say OK "history store: $hfights fights held across logins$extra"
+fi
+
 exit $fail

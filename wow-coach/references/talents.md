@@ -107,3 +107,25 @@ Coaching flow that makes the store earn its keep:
 - Re-run the extractor (or the fallback fetcher) on every game patch,
   same cadence as the sim TSVs; the `build` field tells you when it's
   stale.
+
+
+## Tiered (apex) nodes: what each tool can and cannot say (2026-09-03)
+
+COMBATANT_INFO logs a **tiered** node (an apex like Devourer's "Midnight",
+three entries picked 1+2+1) as one tuple per entry, with absent entries
+simply missing. Since wowdps' history-store branch (MCP rebuilt
+2026-09-03 22:37) `loadout` folds those into one selection —
+`{node_id, ranks: Σ, entries: [{entry_id, ranks}…]}` — and its
+`import_string` round-trips at the summed rank. `decode_talents` on a
+bare import string reports the summed `ranks` only and has no `entries`
+key: the string carries no split. So: `loadout.entries` is the
+authoritative split, a rank total is comparable across both tools, and a
+`loadout`-vs-paste difference on a tiered node is a finding only when the
+`ranks` totals differ. A single node missing from `loadout` (e.g.
+Voidsurge on 2026-09-02) IS real — the tuples simply are not there.
+Every talent response now carries `dataset_build`; compare it against
+the build in the SimC paste header before trusting a decode (the combat
+log itself has no build number).
+
+On a pre-fix daemon (before 2026-09-03) `loadout` kept only the first
+entry's rank, under-counting the node by up to 3 points.
