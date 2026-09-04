@@ -1,0 +1,4 @@
+# WoW client log dumps that land here when the game is launched from this dir
+Logs/
+# local eval inputs (SimC exports etc.) are not shipped
+wow-coach/evals/inputs/

@@ -60,3 +60,7 @@ wow-coach/scripts/fetch-talents-fallback.sh  # talent trees w/o a game install
 Both stamp the sim date and SimC build into the TSV headers; specs missing
 from the output have no bloodmallet chart for the current game build.
 Commit the refreshed TSVs so the data is versioned per patch.
+
+## License
+
+[MIT](LICENSE).

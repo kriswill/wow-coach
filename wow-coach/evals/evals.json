@@ -34,7 +34,7 @@
       "prompt": "Here's my SimC export (in tranqlock.simc) — what free gear wins do I have before raid tonight? Don't spend time on web research, just what the export itself shows.",
       "expected_output": "Finds: missing head and leg enchants (no enchant_id on those slots), the never-filled off-hand slot (watermark 14:0) with Vessel of Last Rites 311 sitting in bags as the fix, banked catalyst charges (catalyst_currencies=...:8), bag-vs-equipped ilvl upgrades (292 cloak/chest/ring vs 289 equipped), and notes alchemy for consumable self-supply. No fabricated web facts.",
       "files": [
-        "/home/k/.claude/skills/wow-coach-workspace/inputs/tranqlock.simc"
+        "wow-coach/evals/inputs/tranqlock.simc"
       ],
       "assertions": [
         "flags missing enchants on unenchanted equipped slots (legs at minimum; head/back/wrist also lack enchant_id in the export — more found = better)",
