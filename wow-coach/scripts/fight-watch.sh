@@ -37,6 +37,7 @@ while true; do
     jq -r '.fights[]?.id' <<<"$hist" > "$HSEEN"
     cursor=$(jq -r '[.fights[]?.start_utc_ms] | max // 0' <<<"$hist")
     jq -r '.fights[] | select(.live != true and .kind=="trash" and .history_id != null) | .history_id' <<<"$live" > "$TSEEN"
+    jq -r '.fights[] | select(.live != true and .kind=="encounter" and .history_id != null) | .history_id' <<<"$live" >> "$HSEEN"
     hstat=$(jq -c '.history // {}' <<<"$("$here/mcp-call.sh" status 2>/dev/null)")
     baseline=0
     echo "watching (history: $(jq -r '.fights // "?"' <<<"$hstat") fights stored, $(jq -r '.importing // 0' <<<"$hstat") importing, cursor=$cursor; live: $(jq -r '.fights|length' <<<"$live") segments, $(grep -c . "$TSEEN") trash baselined; source: $(jq -r .source <<<"$live"))"
@@ -56,6 +57,19 @@ while true; do
         done
     if [ "$newmax" -gt "$cursor" ] 2>/dev/null; then cursor=$newmax; fi
   fi
+
+  # Live boss encounters, keyed on the daemon-computed stable id. Bosses
+  # INSIDE a keystone are never written to the history store (the key's sum is
+  # the stored unit), so the stored stream above never sees them — without
+  # this block a whole dungeon's bosses close silently.
+  jq -r '.fights[] | select(.live != true and .kind=="encounter" and .history_id != null)
+    | "\(.history_id)\t\(.name)\t\(.encounter.id // "-")\t\(.encounter.difficulty // "-")\t\(.duration)\t\(.result // "none")"' <<<"$live" \
+    | while IFS=$'\t' read -r hid name enc diff dur res; do
+        [ -n "$hid" ] || continue
+        grep -qxF "$hid" "$HSEEN" && continue
+        echo "$hid" >> "$HSEEN"
+        printf 'FIGHT COMPLETE  id=%s  encounter %s  enc=%s diff=%s  %s  result=%s\n' "$hid" "$name" "$enc" "$diff" "$dur" "$res"
+      done
 
   # Live trash, keyed on the daemon-computed stable id.
   jq -r '.fights[] | select(.live != true and .kind=="trash" and .history_id != null) | "\(.history_id)\t\(.name)\t\(.duration)"' <<<"$live" \
