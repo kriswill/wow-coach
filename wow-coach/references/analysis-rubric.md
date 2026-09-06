@@ -23,7 +23,41 @@ consumables.**
    their overall share; more than ~10 points lower = padding on fodder. Only
    apply where a priority target exists; on uniform AoE the total is the fair
    metric, and a funnel spec "losing" the trash meter is doing its job.
-5. **Deaths.** Grade each against the recap (newest-first; first row = killing
+5. **Deaths.** Count **every** death, trash included — in a keystone, trash
+   deaths are where runs bleed, and skipping them under the "don't report
+   trash" policy understates the count the player is judged on. That policy
+   governs what you *narrate*, never what you *count*.
+
+   **Price each death as downtime, not as an event.** A death's cost is the
+   time the player was not contributing, which varies enormously with
+   graveyard placement (dungeons advance the graveyard after each boss, so
+   the same death costs far less late in a run than early). Measure it from
+   the raw log, not the 10 s buckets:
+
+   - Find `UNIT_DIED` for the player: `grep -a 'UNIT_DIED' "$log" | grep -i '<name>'`
+   - Find the first following `SPELL_CAST_SUCCESS` by them at a target that
+     is **not themselves**, **excluding pet summons** (Call Dreadstalkers,
+     Summon Demonic Tyrant, Summon Felhunter, Grimoire: *, Fel Domination …).
+     A pet summon is not being back in the fight; the first real cast is.
+     Excluding them moved the mark 2.5–2.9 s per death in the 2026-09-06 key.
+   - **Downtime = death → first real cast.** Split it into *dead* vs
+     *running* using the resurrection point (a battle rez shows as the rez
+     spell cast **on** them — Intercession, Rebirth, Raise Ally, Soulstone;
+     a graveyard run shows as them casting movement/self spells while no rez
+     landed). The run-back half is usually the bigger number and is the part
+     graveyard progression changes.
+   - Buckets are a fallback only, at ±10 s: a run of near-zero 10 s buckets
+     against the player's median bucket in the same segment.
+
+   **Then add the costs the meter never shows:**
+   - **15 s off the key timer per death**, charged directly by the game.
+     Always state this next to the run's margin — a key timed by 47 s with
+     2 deaths paid 30 s of timer plus ~105 s of missing damage, i.e. the
+     deaths cost more than the whole margin, twice over.
+   - **A battle rez consumed** is a group-wide resource spent on the player
+     and appears on no meter. Name it.
+
+   Grade each against the recap (newest-first; first row = killing
    blow):
    - *defensible* — low-HP dwell (≤40% for 3-5 s) or a survivable big hit,
      with a defensive/healthstone available and unused;
@@ -65,7 +99,20 @@ consumables.**
   mechanic, or a change in a previously-flagged behavior. Deliver a boss
   summary when it dies. The user is mid-raid — every message competes with
   the game.
-- Trash/run-back segments: skip unless they show real group-wide combat.
+- Trash/run-back segments: skip **narrating** them unless they show real
+  group-wide combat — but always probe them for deaths (check #5), and fold
+  those into the run's death count. Silence about a trash pull must never
+  become a missing death.
+- **Never name the dungeon or raid from a mob name.** Mob names invite
+  false matches ("Row Rat" is not Murder Row) and a wrong dungeon call
+  sends the player a loot brief for a zone they are not in. Read the zone
+  from the log before naming it:
+  `grep -aE 'ZONE_CHANGE|MAP_CHANGE|CHALLENGE_MODE_START|CHALLENGE_MODE_END' "$log" | tail`
+  A key is live only after a `CHALLENGE_MODE_START` with no matching `_END`.
+  `CHALLENGE_MODE_END,<id>,<completed>,<level>,<ms>` is also the game's own
+  authoritative timing for the run — prefer it over any derived duration.
+  Long "trash" segments in an open-world zone are the daemon spanning world
+  activity between keys; they are not pulls.
 - Deliver kill reviews promptly (between-pulls is when they're read), lead
   with the verdict, keep to ≤3 findings, and always name what *improved* —
   reinforcement is how fixes stick. A terminal notification on kills and

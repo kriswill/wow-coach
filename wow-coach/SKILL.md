@@ -35,10 +35,20 @@ thing it was checking. If the source looks wrong (a fixture, a stale
 directory), report it and give the player the exact command to change it;
 let them decide. FAIL lines block coaching — surface them with the fix the
 script suggests. WARN lines shape
-the session (no game = historical review, not live monitoring). Remember the
-anti-overlay quirk: the game flushes log writes in multi-minute bursts, so
-never diagnose "logging is off" from file quietness — trust `game_running`
-and the indexed-fight count.
+the session (no game = historical review, not live monitoring). The
+anti-overlay quirk cuts both ways: the game flushes log writes in
+multi-minute bursts, so never diagnose "logging is off" from a
+MINUTES-quiet file — but the quirk hides minutes, never hours. **A stale
+log with the game running means combat logging is OFF in-game**
+(`/combatlog` + Advanced Combat Logging), and neither `fight_active` nor
+the indexed-fight count disproves it: both happily report a PREVIOUS
+session's data, `fight_active` on a segment left dangling overnight.
+Pre-flight now checks log mtime for exactly this; if it FAILs, nothing
+indexed is tonight's and no briefing may be built on it. When the player
+enables logging, the daemon rolls onto the new file on its own (segments
+reset to 0, the dangling segment closes and stores) — **re-arm the fight
+watcher after a roll**, since its baseline still refers to the old file's
+segment numbering.
 
 ## Phase 1 — intake
 
@@ -102,8 +112,12 @@ kills and long pulls, batch progression wipes into boss summaries. On each
 graded fight, pull data per `references/mcp-tools.md` (live `fight` /
 `breakdown` on the segment id, or `stored_fight` on the stable id — same
 shapes) and grade per `references/analysis-rubric.md`, with benchmark #1
-from `trend` on that encounter + difficulty. When the fight names show a shopping-list
-boss engaged or approaching, pre-brief the loot call from the gear-intel
+from `trend` on that encounter + difficulty. **Confirm the zone from the log before naming a dungeon** — grep
+`ZONE_CHANGE`/`MAP_CHANGE`/`CHALLENGE_MODE_START`; never infer it from a
+mob name (2026-09-06: "Row Rat" was read as Murder Row and produced a full
+loot brief for a dungeon the player was standing nowhere near — they were
+in Silvermoon City). When the fight names show a shopping-list
+boss engaged or approaching **in a confirmed zone**, pre-brief the loot call from the gear-intel
 note (one line: item, why, over what) — and verify claimed equips against
 the next pull's `loadout` (the item id either sits in the slot or it
 doesn't), with trinket/proc marks as the behavioral cross-check. The same

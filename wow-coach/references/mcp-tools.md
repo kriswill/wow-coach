@@ -36,6 +36,28 @@ means `mcp-call.sh` found a pre-loadout wowdps-mcp binary — rebuild it
 (`cargo build --release -p wowdps-mcp` in the wowdps repo) or point
 `$WOWDPS_MCP` at a build that lists it.
 
+## Response-shape traps (each one has produced a wrong answer)
+
+- **`history` returns its rows under `.fights`, not `.cards`.** A `.cards[]`
+  jq filter yields empty output, which reads exactly like "this player has
+  no history" — on 2026-09-06 that briefly looked like the player's 158
+  stored fights did not exist. When a history query comes back empty,
+  dump the raw envelope (`| head -c 400`) before concluding anything;
+  `count` / `total` in the header tell you immediately whether the store
+  actually matched.
+- **A player-name miss is a tool error, not an empty result.** `history`
+  answers `no stored fight has a player named "X"` — that means the NAME is
+  wrong (an alt, a different character), not that the store is empty. Get
+  the exact name from a `fight` roster.
+- **Bosses inside keystones have no trend line.** They are never stored as
+  pulls of their own — the key's Σ is the stored unit — so `trend` with
+  `encounter: <boss>, difficulty: 8` returns a measure and zero points.
+  That is expected, not a bug. Critically: **never compare a boss's in-fight
+  DPS against a key-overall DPS number.** They are different measures (one
+  fight vs the whole run including trash), and doing so manufactures a
+  collapse that is not there. Benchmark a boss-in-key against the fight's
+  own DPS-role median instead, and say benchmark #1 is unavailable.
+
 ## Recipes proven in practice
 
 What did they actually wear? (ilvl, hero tree, trinkets in one line):

@@ -36,7 +36,33 @@ fi
 if [ "$active" = "true" ]; then
   say OK "a fight is happening right now"
 else
-  say WARN "no live fight (normal between pulls; note: the game flushes log writes in multi-minute bursts, so a quiet log is NOT evidence logging is off — trust game_running, not mtime)"
+  say WARN "no live fight (normal between pulls; the game flushes log writes in multi-minute bursts, so a MINUTES-quiet log is not evidence logging is off — but see the freshness check below, which catches the hours-quiet case)"
+fi
+
+# Log freshness. The burst-flush quirk hides MINUTES, never hours: if the
+# newest combat log has not been touched in a long time while the game is
+# running, combat logging is OFF in-game and nothing will ever close.
+# 2026-09-06: a whole session was briefed off 16-hour-stale data because
+# every other check passed — `fight_active` was a dangling segment from the
+# previous night and the indexed-fight count was that night's. Neither is
+# evidence of a LIVE pipeline. Never diagnose this from segment counts.
+if [ "$src" != "none" ] && [ "$src" != "null" ]; then
+  logdir="${src#logs:}"
+  newest=$(ls -t "$logdir"/WoWCombatLog-*.txt 2>/dev/null | head -1)
+  if [ -z "$newest" ]; then
+    say FAIL "no WoWCombatLog-*.txt in $logdir — combat logging has never been enabled here (/combatlog in-game)"
+    fail=1
+  else
+    age=$(( $(date +%s) - $(stat -c %Y "$newest" 2>/dev/null || echo 0) ))
+    if [ "$game" = "true" ] && [ "$age" -gt 900 ]; then
+      say FAIL "newest combat log is $((age/60))m stale ($(basename "$newest")) while the game is RUNNING — combat logging is off. Fix in-game: /combatlog, and confirm Advanced Combat Logging (Options > Network). Everything indexed right now is from a PREVIOUS session — do not grade or brief off it."
+      fail=1
+    elif [ "$age" -gt 900 ]; then
+      say WARN "newest combat log is $((age/60))m stale ($(basename "$newest")) — expected with the game closed; historical review only"
+    else
+      say OK "combat log fresh ($((age/60))m: $(basename "$newest"))"
+    fi
+  fi
 fi
 
 fights=$("$here/mcp-call.sh" list_fights 2>/dev/null | jq '.fights | length' 2>/dev/null || echo 0)
