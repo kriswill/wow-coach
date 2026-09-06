@@ -57,8 +57,18 @@ consumables.**
    - **A battle rez consumed** is a group-wide resource spent on the player
      and appears on no meter. Name it.
 
-   Grade each against the recap (newest-first; first row = killing
-   blow):
+   **The killing blow is the newest `kind: "damage"` row, NOT the newest
+   row.** Recaps read newest-first, but a self-heal or absorb proc can land
+   after the fatal hit and sit on top of it — a warlock's Soul Leech does
+   exactly this. Every `death_recap` row carries `kind`
+   (`"damage"` / `"gain"`, wowdps `70e733d`), so filter on it rather than
+   taking `[0]`:
+   `jq '[.death_recap[]|select(.kind=="damage")][0]'`.
+   On a build without `kind`, fall back to `share_pct > 0` and say you did.
+   `kind` also answers "was this a hit or a heal" for a class you don't
+   know — never infer that from a spell name.
+
+   Grade each against the recap:
    - *defensible* — low-HP dwell (≤40% for 3-5 s) or a survivable big hit,
      with a defensive/healthstone available and unused;
    - *mitigable* — main defensive on CD but healthstone/secondary was up;

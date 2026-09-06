@@ -77,7 +77,18 @@ Did the player survive? (empty recap = survived):
 mcp-call.sh breakdown '{"segment_id":44,"player":"Tranq","view":"deaths"}' \
   | jq -r 'if (.death_recap|length)==0 then "SURVIVED" else (.death_recap[:5][] | "\(.name) \(.amount) hp=\(.health_after.current // "?")") end'
 ```
-Death recaps read newest-first: the first row is the killing blow.
+Death recaps read newest-first, but **the first row is NOT necessarily the
+killing blow** — a gain (self-heal, absorb proc) can land after the fatal
+hit and sit on top of it. Every row carries `kind` (`"damage"` / `"gain"`,
+wowdps `70e733d`); the killing blow is the newest `kind: "damage"` row:
+```sh
+mcp-call.sh breakdown '{"segment_id":44,"player":"Tranq","view":"deaths"}' \
+  | jq -r '[.death_recap[]|select(.kind=="damage")][0] | "\(.name) \(.amount) hp=\(.health_after.current // "?")"'
+```
+`kind` is also the only reliable damage/gain discriminator — a row's name
+tells you nothing unless you happen to know the class (Soul Leech is a
+warlock heal, not a hit). On a pre-`70e733d` build the field is absent;
+`share_pct > 0` is the fallback, and say that you used it.
 
 Cheap "anything changed?" probe (one line):
 ```sh
