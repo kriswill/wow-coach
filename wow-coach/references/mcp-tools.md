@@ -297,3 +297,18 @@ when the line must be one difficulty.)
 Owner note: `players[].name` is the display name; `player` args accept the
 usual prefix. Cards carry `owner: null` today — filter by `player`, not by
 owner.
+
+- **Key cards already carry the par and the rate — under different names.**
+  A `history` key card has `keystone_pars_ms: [par, +2, +3]` (ms) and
+  `me.dps`; `par_ms` / `me.per_sec` were null on proto 33 and read as
+  "the store has no par" (2026-09-15, retest 35). Over/under = `official_ms
+  - keystone_pars_ms[0]`. The dev side has since added `par_ms` +
+  `par_delta_ms` and a `per_sec` alias, so both spellings should answer
+  from the next mcp build on.
+- **`stored_fight` nests the card under `.fight`.** Top-level `.name`,
+  `.result`, `.duration_ms` are all null on a perfectly good response
+  (top-level keys are `available_views, fight, rows, tier, view`) — the same
+  "empty result that is really a wrong path" trap as `history .cards`.
+- **`pin_fight` on an in-key boss id is a no-op by design** — member bosses
+  have no card of their own; pin the key. Newer builds return an explicit
+  error naming the key to pin instead of `pinned:false`.
