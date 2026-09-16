@@ -16,7 +16,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 specs=(
   death_knight/blood death_knight/frost death_knight/unholy
-  demon_hunter/havoc demon_hunter/vengeance
+  demon_hunter/havoc demon_hunter/vengeance demon_hunter/devourer
   druid/balance druid/feral druid/guardian
   evoker/devastation evoker/augmentation
   hunter/beast_mastery hunter/marksmanship hunter/survival
