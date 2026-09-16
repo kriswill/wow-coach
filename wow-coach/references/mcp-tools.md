@@ -49,6 +49,20 @@ means `mcp-call.sh` found a pre-loadout wowdps-mcp binary — rebuild it
   answers `no stored fight has a player named "X"` — that means the NAME is
   wrong (an alt, a different character), not that the store is empty. Get
   the exact name from a `fight` roster.
+- **`progression` is ROSTER-BLIND.** It counts every stored pull of an
+  encounter+difficulty across the whole store, regardless of who was in the
+  raid. On 2026-09-09 that produced "the raid has killed Heroic Sszorak
+  before, 08-31 and 09-06, so this group has done it" — the player caught
+  it: those kills were a different guild's roster (the owner's OTHER
+  character's raid team), with ZERO name overlap with the group standing in
+  front of the boss. `pulls`/`kills`/`nights` describe the OWNER's history
+  with a boss, never a given group's. Before saying anything about what
+  "this group" has or hasn't done, diff the rosters:
+  `history {"encounter":N,"difficulty":D,"players":"all"}` on the kills vs
+  `history {"fight_id":"<tonight's pull>","players":"all"}`. A progression
+  wall means something very different for a roster that has killed the boss
+  than for one on genuine progression.
+
 - **Bosses inside keystones have no trend line.** They are never stored as
   pulls of their own — the key's Σ is the stored unit — so `trend` with
   `encounter: <boss>, difficulty: 8` returns a measure and zero points.

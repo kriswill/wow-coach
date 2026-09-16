@@ -56,6 +56,29 @@ segment numbering.
   users have a name pattern on file); otherwise ask, or spot them in
   `list_fights`→`fight` rosters. Note spec from their meter rows — it can
   change mid-session, and the rubric follows the spec.
+- **Which team** (raid and any grouped content — ALWAYS, before any
+  group-level claim): the player raids with **more than one team**, and
+  which one they are with changes what every group-level number means.
+  Run `scripts/raid-team.sh <character>`: it prints tonight's roster size
+  and the overlap against each of that character's previous nights, with a
+  SAME TEAM / MIXED / DIFFERENT TEAM verdict per night.
+  **The combat log carries no guild field** — no event has one,
+  `COMBATANT_INFO` included — so a team is identified by WHO IS IN THE
+  RAID, never read off a guild tag. Overlap is `shared / smaller roster`:
+  **>=60 % same team · 30-59 % mixed (regulars + heavy fill) · <30 %
+  another team or a pug.**
+  Character is a strong hint but never the answer on its own: most of this
+  player's characters raid with one guild's team, and **the demon hunter
+  (Tranqster) raids with a DIFFERENT guild** from the rest. Note the team
+  in memory alongside the character, and re-verify each night — people
+  transfer, teams merge, and a pug night looks exactly like the regular
+  night until the rosters are compared.
+  **Nothing about "this group" may be said before this runs** — not
+  "they've killed this before", not "this roster struggles with X". See
+  the roster-blind `progression` trap in `references/mcp-tools.md`: on
+  2026-09-09 that produced a confident wrong claim that the raid had killed
+  Heroic Sszorak before, when those kills belonged to another character's
+  team with zero name overlap. The player caught it.
 - **History first, memory second**: the numbers live in the wowdps history
   store, not in memory. Two calls per character (recipes in
   `references/mcp-tools.md` §history): `history` for the last session's
@@ -131,7 +154,15 @@ Every graded fight updates the trend line (DPS, key-ability shares, death
 grade, consumable count). The DPS half of that line is the store's `trend`
 for the player on that encounter + difficulty — cite it with dates, not
 from memory. A boss summary quotes `progression` (pulls, kills, first
-kill, median kill time) and the `sort:"fastest"` card as the best kill.
+kill, median kill time) — **but `progression` counts pulls store-wide
+across every team the player has raided with**, so it answers "have YOU
+killed this boss" and never "has THIS group killed it". Scope any
+group-level sentence to the team `scripts/raid-team.sh` identified, and
+when the boss's prior kills came from a different roster, say so: a wall
+means something entirely different for a team that has killed the boss
+than for one on genuine progression. The player's own trend line is
+roster-independent and needs no such caveat.
+The `sort:"fastest"` card is the best kill.
 Cross-night comparisons of the same boss use `stored_fight` breakdowns
 and timelines, which exist for kills, bests and pinned fights only. When a same-spec player shares the fight, run
 `compare` and decompose the gap into named components (tier/gear source
@@ -149,7 +180,12 @@ update so the next session resumes with the player, findings, and any
 retractions intact — **not the numbers**: the history store holds every
 fight, so memory records findings, homework, loot targets and
 retractions, and points at stable fight ids where a finding needs a
-receipt. Before closing, `pin_fight` the night's best kill per boss and
+receipt. **Record the team** the character raided with — a few anchor
+names plus the overlap `scripts/raid-team.sh` reported — so next session
+recognises the roster instead of re-deriving it, and note when a night
+was a pug or a heavy-fill night, since that reframes every group-level
+number in the report.
+Before closing, `pin_fight` the night's best kill per boss and
 every fight a finding or retraction cites, so their breakdowns survive
 retention and next session's report can chart the same boss across nights. **HTML reports always go in `~/Documents/wow-coach/`**,
 named `<character>-<context>-report-<YYYY-MM-DD>.html` (e.g.
@@ -209,6 +245,7 @@ development session directly — never through the player.
 | `references/analysis-rubric.md` | before grading any fight — checks, benchmarks, reporting policy, evidence hierarchy |
 | `references/simc-input.md` | when a SimC paste arrives |
 | `references/research-agents.md` | when launching or refereeing research agents |
+| `scripts/raid-team.sh` | at raid intake, and before ANY claim about what "this group"/"the raid" has done — roster-overlap team identification (there is no guild field in the log) |
 | `references/gear-intel.md` | when building or consulting the BiS map, shopping list, crafting notes, or stat/bag audit |
 | `references/trinket-sims.tsv` | when judging any trinket (paste review, drop call, bag audit) — grep the player's class+spec for bloodmallet's ranked ilvl→DPS sim data; refresh per patch via `scripts/fetch-trinket-sims.sh` |
 | `references/secondary-sims.tsv` | when judging a stat mix (paste review, gem/enchant choice, regem question) — bloodmallet's best crit/haste/mastery/vers splits per spec at 1/3/5 targets; refresh per patch via `scripts/fetch-secondary-sims.sh` |
