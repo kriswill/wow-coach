@@ -14,7 +14,11 @@ if [ $? -ne 0 ]; then
   say FAIL "wowdps daemon/mcp unreachable: $status"
   exit 1
 fi
-say OK "daemon running (spawned on demand if needed)"
+if systemctl --user cat wowdps-dev.service >/dev/null 2>&1; then
+  say OK "daemon running (wowdps-dev unit — never start one by hand)"
+else
+  say OK "daemon running (spawned on demand if needed)"
+fi
 
 src=$(jq -r '.source // "none"' <<<"$status")
 game=$(jq -r '.game_running' <<<"$status")

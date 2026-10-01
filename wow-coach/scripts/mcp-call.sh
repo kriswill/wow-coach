@@ -1,13 +1,46 @@
 #!/usr/bin/env bash
 # One-shot call to a wowdps MCP tool. Prints the tool's JSON document on
 # stdout; exits non-zero (with the error on stderr) on tool or transport
-# failure. The daemon is spawned on demand by wowdps-mcp itself.
+# failure. The daemon is spawned on demand by wowdps-mcp itself — except on
+# a host running the wowdps-dev systemd user unit, see unit_gate.
 #
 #   mcp-call.sh <tool> [json-arguments]
 #   mcp-call.sh fight '{"segment_id":42}'
+#   mcp-call.sh --gate        # just the unit check: exit 0 = safe to call
 #
 # Override binary discovery with $WOWDPS_MCP.
 set -euo pipefail
+
+# Where the wowdps-dev unit is installed it owns the daemon, and wowdps-mcp's
+# ensure_daemon would SPAWN a stray, non-lingering daemon whenever the socket
+# is missing — mid unit restart, that stray wins the socket race and the unit
+# loses it (2026-09-28, reported by the wowdps dev session). So on such a
+# host, call only while the unit is active AND its socket is listening, and
+# otherwise exit 3 without ever starting wowdps-mcp. No unit installed = the
+# old on-demand spawn. WOWDPS_NO_UNIT_GATE=1 skips the check.
+unit_gate() {
+  [ -n "${WOWDPS_NO_UNIT_GATE:-}" ] && return 0
+  systemctl --user cat wowdps-dev.service >/dev/null 2>&1 || return 0
+  if ! systemctl --user is-active --quiet wowdps-dev; then
+    echo "mcp-call.sh: wowdps-dev unit not active — not calling (it would spawn a stray daemon). Start it: systemctl --user start wowdps-dev" >&2
+    return 3
+  fi
+  # A stale socket FILE survives a restart (wowdps-v34.sock did), so ask
+  # for a listening socket, not a path.
+  local dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wowdps"
+  if command -v ss >/dev/null; then
+    ss -xlH 2>/dev/null | grep -qF "$dir/wowdps-v" && return 0
+  elif compgen -G "$dir/wowdps-v*.sock" >/dev/null; then
+    return 0
+  fi
+  echo "mcp-call.sh: wowdps-dev is active but its socket is not listening yet — not calling (it would spawn a stray daemon)" >&2
+  return 3
+}
+
+if [ "${1:-}" = "--gate" ]; then
+  rc=0; unit_gate || rc=$?; exit "$rc"
+fi
+unit_gate || exit $?
 
 tool="${1:?usage: mcp-call.sh <tool> [json-args]}"
 args="${2:-{\}}"

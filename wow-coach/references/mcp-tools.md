@@ -1,7 +1,13 @@
 # wowdps MCP tools — cheat sheet
 
 All calls go through `scripts/mcp-call.sh <tool> '<json-args>'`, which prints the
-tool's JSON document on stdout. The daemon is spawned on demand. Two ids name
+tool's JSON document on stdout. The daemon is spawned on demand — except
+where the `wowdps-dev` systemd user unit is installed: it is then the only
+sanctioned daemon (restart: `systemctl --user restart wowdps-dev`, never by
+hand), and `mcp-call.sh` refuses with exit 3 while the unit is inactive or
+its socket is not listening, because a call into that gap spawns a stray
+daemon that steals the unit's socket (`mcp-call.sh --gate` is the bare
+check; `fight-watch.sh` backs off 30 s on it). Two ids name
 a fight: the integer `segment_id` from `list_fights` is **per daemon run**
 (never cache it), and the string `history_id` on every closed row is the
 history store's **stable id** (`<log>-<start_ms>`) — cache and cite that

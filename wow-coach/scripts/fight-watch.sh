@@ -24,6 +24,9 @@ baseline=1
 cursor=0
 
 while true; do
+  # Never poll into a wowdps-dev restart gap: a call there would spawn a
+  # stray daemon that steals the unit's socket (see mcp-call.sh unit_gate).
+  if ! "$here/mcp-call.sh" --gate 2>/dev/null; then sleep 30; continue; fi
   hist=$("$here/mcp-call.sh" history '{"limit":40,"sort":"newest","players":"none"}' 2>/dev/null) || hist=""
   live=$("$here/mcp-call.sh" list_fights 2>/dev/null) || live=""
 
