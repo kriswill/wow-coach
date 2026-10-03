@@ -15,6 +15,16 @@ one. `fight`, `breakdown`, `compare` and `loadout` accept either
 `segment_id` or `fight_id` (the stable id) for anything in the tailed log;
 an older night's id is a tool error that says to use `stored_fight`.
 
+> **v40 re-baseline (PR #74, 2026-10-02).** Amounts exclude overkill (kept in
+> each row's `overkill`), Spirit Link Totem is friendly fire rather than the
+> Shaman's damage, and `per_sec` divides by **combat time** (`combat_ms` on every
+> fight object). Key rows add **`run_per_sec`**, the old key-timer rate; key
+> `per_sec` reads about 6 % higher. The whole store was regraded, so `trend` and
+> `history` are internally consistent. **Any DPS number in memory or a report
+> from before 2026-10-03 uses the old rules and must not be compared with v40
+> output.** Re-pull the trend instead. The socket is now `wowdps-v40.sock`, so a
+> pre-v40 `wowdps-mcp` fails with "…v39.sock never answered".
+
 | Tool | Args | Gives you |
 |---|---|---|
 | `status` | `{}` | daemon source, `game_running`, `fight_active`, overlay state |
@@ -104,6 +114,17 @@ wowdps `70e733d`); the killing blow is the newest `kind: "damage"` row:
 ```sh
 mcp-call.sh breakdown '{"segment_id":44,"player":"Tranq","view":"deaths"}' \
   | jq -r '[.death_recap[]|select(.kind=="damage")][0] | "\(.name) \(.amount) hp=\(.health_after.current // "?")"'
+```
+**Several deaths in one fight (a key):** the `deaths` view answers the LAST
+death by default and lists every death in `deaths[]` (`index`, `at`, `at_ms`
+from the fight start). Select another with **`"death": N`**. The response
+echoes it as `death_index`, but passing `death_index` as the argument is
+silently ignored and you get the last death back (found 2026-10-02). Census a
+whole key from `deaths[]` before reaching for the raw log:
+```sh
+mcp-call.sh stored_fight '{"fight_id":"<key id>","player":"Tranq","view":"deaths"}' | jq -r '.deaths[] | "\(.index) \(.at)"'
+mcp-call.sh stored_fight '{"fight_id":"<key id>","player":"Tranq","view":"deaths","death":3}' \
+  | jq -r '[.death_recap[]|select(.kind=="damage")][:4][] | "\(.offset_secs)s \(.name) \(.amount) hp=\(.health_after.current)"'
 ```
 `kind` is also the only reliable damage/gain discriminator — a row's name
 tells you nothing unless you happen to know the class (Soul Leech is a
