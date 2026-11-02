@@ -75,7 +75,9 @@ means `mcp-call.sh` found a pre-loadout wowdps-mcp binary — rebuild it
   with a boss, never a given group's. Before saying anything about what
   "this group" has or hasn't done, diff the rosters:
   `history {"encounter":N,"difficulty":D,"players":"all"}` on the kills vs
-  `history {"fight_id":"<tonight's pull>","players":"all"}`. A progression
+  `stored_fight {"fight_id":"<tonight's pull>"}` → `.fight.players` (same
+  row shape as `history players:"all"`; `history` has no `fight_id`
+  argument). A progression
   wall means something very different for a roster that has killed the boss
   than for one on genuine progression.
 
@@ -152,6 +154,57 @@ mcp-call.sh breakdown '{"segment_id":N,"player":"X"}' \
   before blaming an individual — shared valleys are fight mechanics.
 - `marks` timestamps let you check opener alignment (lust/PI/potion inside the
   first ~10 s) and potion cadence (5-min CD → expect a re-use).
+
+## Death order on a wipe (v41–v48, response-42, 2026-10-26)
+
+"Did they die with the raid or ahead of it?" is one call, no raw-log grep.
+`stored_fight {fight_id, view:"deaths"}` (no `player`) returns
+`raid.deaths[]` **in the order they happened**: `at_secs`, `player`, `key`,
+`spec`, `death` (that player's index), `killing_blow`, `source`, `hit`,
+`overkill`, `rezzed_at_secs`/`rezzed_by`; plus `raid.lust[]` and
+`raid.per_sec` (raid DTPS per 10 s). Since v45 **every progression wipe**
+(boss not yet killed at that difficulty) stays at the details tier all
+season, however short; since v42 kills are never demoted.
+```sh
+mcp-call.sh stored_fight '{"fight_id":"<id>","view":"deaths"}' | jq -r \
+  '"\(.raid.deaths|length) deaths", (.raid.deaths|to_entries[]|select(.value.player|test("^Tranq"))
+   | "nth=\(.key+1) at=\(.value.at_secs)s kb=\(.value.killing_blow) hit=\(.value.hit)")'
+```
+`"death": N` counts from **0** (`death:0` = the first death; `deaths[].index`
+shows it). **Every tool silently drops arguments it doesn't know** — `history`
+has no `fight_id`, so `history {"fight_id":…}` returns the newest card
+(retest 43, 2026-10-26). One fight's roster and grades: `stored_fight
+{fight_id}` → `.fight.players` (name, key, me, class, spec, role, guild,
+dps, hps, deaths, dtps…), or `history_sql` over `players WHERE fight_id = ?`.
+A misspelled argument fails the same silent way — check the echo. In a shell loop, run `mcp-call.sh … < /dev/null`: inside a
+`while read` it eats the loop's input and misaligns results.
+
+**`killing_blow` is the recap's last damaging line**, so a death with no
+real damage reads as a self-tick (Fel Armor 615, Purgatory) or `null`/`hit:0`.
+At high health that is a **fall / knock-off / void death** (2026-10-25 Mythic
+Sszorak: dead 5–7 s after Raging Crosswinds at 73 % HP, kb "Fel Armor 615").
+Read the recap (`+ "player", "death":N`) before naming a cause.
+A whole night in one `history_sql` (add `AND NOT f.imported` to any query
+about the user's own fights, v46):
+```sql
+SELECT f.id, d.r.at_ms, p.name,
+       row_number() OVER (PARTITION BY f.id ORDER BY d.r.at_ms) AS nth
+FROM fights f JOIN rows r ON r.id = f.id, UNNEST(r.recaps) AS d(r)
+JOIN players p ON p.fight_id = f.id AND p.guid = d.r.guid
+WHERE f.encounter.id = ? AND f.encounter.difficulty = ? AND f.start_utc_ms >= ? AND NOT f.imported
+ORDER BY f.start_utc_ms, d.r.at_ms
+```
+The bundled DuckDB has **no time-zone functions** — local time is
+`start_local_ms`, or `start_utc_ms + tz_min*60000`.
+
+Other v41–v48 fields worth knowing: timeline marks `kind:"death"` with
+`active_secs` = time dead and `open:true` if never rezzed (v41); recap
+`health_after.absorb` (v43); by-ability `starts` (casts begun − landed =
+cancelled/kicked/moved, v43); `loadout` gains `stats` and `auras` (flask,
+food, rune, vantus at the pull, v43); `stored_fight {player}` gains
+`energize` (resource waste, v43) and `power` (per-second pools, v44); key
+cards carry `instance.affixes` (v47). Imported fights (`origin.kind:
+"imported"`) never appear in `history`/`progression`/`role_night` (v46).
 
 ## The history store (fights that persist across logins)
 
